@@ -73,19 +73,19 @@ with steps[0]:
 
     df_centro_poblado = energias_df[energias_df['Código Centro Poblado'] == id_centro_poblado]
 
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x = df_centro_poblado['Fecha Demanda Máxima'], y = df_centro_poblado['Potencia Máxima [kW]'], mode='lines', name = 'Potencia Máxima [kW]', yaxis='y1'))
-    fig.add_trace(go.Scatter(x = df_centro_poblado['Fecha Demanda Máxima'], y = df_centro_poblado['Promedio Diario [h]'], mode='lines', name = 'Promedio Diario [h]', yaxis='y2'))
-    fig.update_layout(title='Potencia Máxima y Promedio Diario por Hora vs Fecha Demanda Máxima', xaxis_title='Fecha', 
-                      yaxis=dict(title='Potencia Máxima [kW]', side='left'), 
-                      yaxis2=dict(title='Promedio Diario [h]', overlaying='y', side='right'), 
-                      hovermode='x unified')
-    st.plotly_chart(fig, use_container_with=True)
+    # fig = go.Figure()
+    # fig.add_trace(go.Scatter(x = df_centro_poblado['Fecha Demanda Máxima'], y = df_centro_poblado['Potencia Máxima [kW]'], mode='lines', name = 'Potencia Máxima [kW]', yaxis='y1'))
+    # fig.add_trace(go.Scatter(x = df_centro_poblado['Fecha Demanda Máxima'], y = df_centro_poblado['Promedio Diario [h]'], mode='lines', name = 'Promedio Diario [h]', yaxis='y2'))
+    # fig.update_layout(title='Potencia Máxima y Promedio Diario por Hora vs Fecha Demanda Máxima', xaxis_title='Fecha', 
+    #                   yaxis=dict(title='Potencia Máxima [kW]', side='left'), 
+    #                   yaxis2=dict(title='Promedio Diario [h]', overlaying='y', side='right'), 
+    #                   hovermode='x unified')
+    # st.plotly_chart(fig, use_container_with=True)
 
 
-    # fig_pot_fech = px.line(df_centro_poblado, x = 'Fecha Demanda Máxima', y = 'Potencia Máxima [kW]', title='Potencia Máxima Vs Fecha Demanda Máxima')
-    # st.plotly_chart(fig_pot_fech, use_container_width=True) 
+    fig_pot_fech = px.line(df_centro_poblado, x = 'Fecha Demanda Máxima', y = 'Potencia Máxima [kW]', title='Potencia Máxima Vs Fecha Demanda Máxima')
+    st.plotly_chart(fig_pot_fech, use_container_width=True) 
 
-    # fig_prom_fech = px.line(df_centro_poblado, x = 'Fecha Demanda Máxima', y = 'Promedio Diario [h]', title='Promedio Diario Vs Fecha Demanda Máxima')
-    # st.plotly_chart(fig_prom_fech, use_container_width=True) 
+    fig_prom_fech = px.line(df_centro_poblado, x = 'Fecha Demanda Máxima', y = 'Promedio Diario [h]', title='Promedio Diario Vs Fecha Demanda Máxima')
+    st.plotly_chart(fig_prom_fech, use_container_width=True) 
 
