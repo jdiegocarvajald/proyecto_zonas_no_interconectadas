@@ -10,6 +10,12 @@ from plotly.subplots import make_subplots
 import math
 from scipy.stats import gaussian_kde
 import pydeck as pdk
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.metrics import silhouette_score
+
+
 st.set_page_config(layout="centered",
     page_title="Energía Zonas no Interconectadas",
     page_icon="💡"
@@ -17,14 +23,14 @@ st.set_page_config(layout="centered",
 t1,t2=st.columns(
     [0.3,0.7]
     ) 
-t1.image(
-    'zonas_no_interconectadas.webp', width = 300
-    )
+# t1.image(
+#     'zonas_no_interconectadas.webp', width = 300
+#     )
 t2.title(
     "Estado de Prestación de Servicios en Zonas no Interconectadas de Colombia"
     )
 engine=create_engine(
-    "postgresql://postgres:Entropia18*@localhost:5432/EnergiasZonasNoInterconectadasCol"
+    "postgresql+psycopg2://postgres:123456@localhost:5432/zniBasedatos?client_encoding=WIN1252"
     )
 energias_df=pd.read_sql(
     'SELECT * FROM energias.servicios_detalle;' , engine
@@ -224,6 +230,78 @@ if opcion=="Análisis general":
                 st.plotly_chart(
                     pie_nbi_loc, use_container_width=True
                 )
+    with steps1[2]:
+        st.header("Análisis de Agrupamiento (Clusters)")
+        # Variables relevantes
+        variables = ['Energía Activa [kWh]', 'Energía Reactiva [kVArh]', 'Potencia Máxima [kW]', 'Promedio Diario [h]', 'Factor de Potencia']
+
+        df_cluster = energias_df[variables + ['Centro Poblado', 'Municipio', 'Departamento']].dropna()
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(df_cluster[variables])
+
+        # Método del codo (opcional, si quieres ver cuál K usar)
+        with st.expander("Ver método del codo para elegir número óptimo de clusters"):
+            distortions = []
+            K_range = range(2, 10)
+            for k in K_range:
+                km = KMeans(n_clusters=k, random_state=42, n_init='auto')
+                km.fit(X_scaled)
+                distortions.append(km.inertia_)
+
+            fig_elbow = px.line(x=list(K_range), y=distortions, markers=True,
+                                labels={'x': 'Número de Clusters (k)', 'y': 'Inercia'},
+                                title="Método del Codo para elegir k")
+            st.plotly_chart(fig_elbow, use_container_width=True)
+
+        # Selector de número de clusters
+        k = st.slider("Selecciona el número de clusters", min_value=2, max_value=10, value=4)
+
+        # KMeans clustering
+        kmeans = KMeans(n_clusters=k, random_state=42, n_init='auto')
+        df_cluster['Cluster'] = kmeans.fit_predict(X_scaled)
+
+        # PCA para visualización en 2D
+        pca = PCA(n_components=2)
+        X_pca = pca.fit_transform(X_scaled)
+        df_cluster['PC1'] = X_pca[:, 0]
+        df_cluster['PC2'] = X_pca[:, 1]
+
+        # Visualización de clusters
+        fig_clusters = px.scatter(
+            df_cluster,
+            x='PC1', y='PC2',
+            color=df_cluster['Cluster'].astype(str),
+            hover_data=['Departamento', 'Municipio', 'Centro Poblado'],
+            title=f"Visualización de Clusters (k = {k})",
+            labels={'color': 'Cluster'}
+        )
+        st.plotly_chart(fig_clusters, use_container_width=True)
+
+        # Mostrar tabla agrupada por cluster
+        with st.expander("🧾 Ver descripción por cluster"):
+            resumen_cluster = df_cluster.groupby('Cluster')[variables].mean().round(2)
+            # Clasificación automática de clusters basada en valores promedio
+            def clasificar_cluster(row):
+                if row['Energía Activa [kWh]'] > 50000 and row['Factor de Potencia'] < 0.85:
+                    return "🔴 Alto consumo / Baja eficiencia"
+                elif row['Potencia Máxima [kW]'] < 60 and row['Factor de Potencia'] >= 0.95:
+                    return "🟢 Baja potencia / Alta eficiencia"
+                elif row['Energía Reactiva [kVArh]'] > 15000:
+                    return "🟡 Alta energía reactiva"
+                elif row['Factor de Potencia'] < 0.8:
+                    return "⚠️ Muy baja eficiencia"
+                else:
+                    return "⚪ Comportamiento mixto"
+
+            resumen_cluster['Descripción'] = resumen_cluster.apply(clasificar_cluster, axis=1)
+            # Añadir etiquetas a cada centro poblado
+            df_cluster['Etiqueta'] = df_cluster['Cluster'].map(resumen_cluster['Descripción'])
+            
+            st.dataframe(df_cluster[['Departamento', 'Municipio', 'Centro Poblado', 'Cluster', 'Etiqueta']].sort_values(by='Cluster'))
+
+            st.dataframe(resumen_cluster)
+
+            st.dataframe(df_cluster[['Departamento', 'Municipio', 'Centro Poblado', 'Cluster']].sort_values(by='Cluster'))
 
 if opcion=="Análisis por centro poblado":
     steps=st.tabs(
