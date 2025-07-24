@@ -10,6 +10,11 @@ from plotly.subplots import make_subplots
 import math
 from scipy.stats import gaussian_kde
 import pydeck as pdk
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.metrics import silhouette_score
+
 st.set_page_config(layout="centered",
     page_title="Energía Zonas no Interconectadas",
     page_icon="💡"
@@ -268,6 +273,78 @@ if opcion=="Análisis general":
                 st.plotly_chart(
                     pie_nbi_loc, use_container_width=True
                 )
+    with steps1[2]:
+        st.header("Análisis de Agrupamiento (Clusters)")
+        # Variables relevantes
+        variables = ['Energía Activa [kWh]', 'Energía Reactiva [kVArh]', 'Potencia Máxima [kW]', 'Promedio Diario [h]', 'Factor de Potencia']
+
+        df_cluster = energias_df[variables + ['Centro Poblado', 'Municipio', 'Departamento']].dropna()
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(df_cluster[variables])
+
+        # Método del codo (opcional, si quieres ver cuál K usar)
+        with st.expander("Ver método del codo para elegir número óptimo de clusters"):
+            distortions = []
+            K_range = range(2, 10)
+            for k in K_range:
+                km = KMeans(n_clusters=k, random_state=42, n_init='auto')
+                km.fit(X_scaled)
+                distortions.append(km.inertia_)
+
+            fig_elbow = px.line(x=list(K_range), y=distortions, markers=True,
+                                labels={'x': 'Número de Clusters (k)', 'y': 'Inercia'},
+                                title="Método del Codo para elegir k")
+            st.plotly_chart(fig_elbow, use_container_width=True)
+
+        # Selector de número de clusters
+        k = st.slider("Selecciona el número de clusters", min_value=2, max_value=10, value=4)
+
+        # KMeans clustering
+        kmeans = KMeans(n_clusters=k, random_state=42, n_init='auto')
+        df_cluster['Cluster'] = kmeans.fit_predict(X_scaled)
+
+        # PCA para visualización en 2D
+        pca = PCA(n_components=2)
+        X_pca = pca.fit_transform(X_scaled)
+        df_cluster['PC1'] = X_pca[:, 0]
+        df_cluster['PC2'] = X_pca[:, 1]
+
+        # Visualización de clusters
+        fig_clusters = px.scatter(
+            df_cluster,
+            x='PC1', y='PC2',
+            color=df_cluster['Cluster'].astype(str),
+            hover_data=['Departamento', 'Municipio', 'Centro Poblado'],
+            title=f"Visualización de Clusters (k = {k})",
+            labels={'color': 'Cluster'}
+        )
+        st.plotly_chart(fig_clusters, use_container_width=True)
+
+        # Mostrar tabla agrupada por cluster
+        with st.expander("🧾 Ver descripción por cluster"):
+            resumen_cluster = df_cluster.groupby('Cluster')[variables].mean().round(2)
+            # Clasificación automática de clusters basada en valores promedio
+            def clasificar_cluster(row):
+                if row['Energía Activa [kWh]'] > 50000 and row['Factor de Potencia'] < 0.85:
+                    return "🔴 Alto consumo / Baja eficiencia"
+                elif row['Potencia Máxima [kW]'] < 60 and row['Factor de Potencia'] >= 0.95:
+                    return "🟢 Baja potencia / Alta eficiencia"
+                elif row['Energía Reactiva [kVArh]'] > 15000:
+                    return "🟡 Alta energía reactiva"
+                elif row['Factor de Potencia'] < 0.8:
+                    return "⚠️ Muy baja eficiencia"
+                else:
+                    return "⚪ Comportamiento mixto"
+
+            resumen_cluster['Descripción'] = resumen_cluster.apply(clasificar_cluster, axis=1)
+            # Añadir etiquetas a cada centro poblado
+            df_cluster['Etiqueta'] = df_cluster['Cluster'].map(resumen_cluster['Descripción'])
+            
+            st.dataframe(df_cluster[['Departamento', 'Municipio', 'Centro Poblado', 'Cluster', 'Etiqueta']].sort_values(by='Cluster'))
+
+            st.dataframe(resumen_cluster)
+
+            st.dataframe(df_cluster[['Departamento', 'Municipio', 'Centro Poblado', 'Cluster']].sort_values(by='Cluster'))
 
 if opcion=="Análisis por centro poblado":
     steps=st.tabs(
@@ -385,141 +462,134 @@ if opcion=="Análisis por centro poblado":
             fig_energias,use_container_width=True
             )
     with steps[3]:
-        analisis = st.selectbox(
-            'Seleccione el tipo de análsis descriptivo',
-            ['Análisis descriptivos para variables cuantitativas',
-            'Análisis descriptivos multivariados']
-        )
-        if analisis=='Análisis descriptivos para variables cuantitativas':
-            estadistica = st.selectbox(
-                f'Medidas individales de la variable seleccionada ({y_var})',
-                ['Medidas de tendencia central','Medidas de variabilidad',
-                'Medidas de forma','Medidas de posición']
+        estadistica = st.selectbox(
+            f'Medidas individales de la variable seleccionada ({y_var})',
+            ['Medidas de tendencia central','Medidas de variabilidad',
+            'Medidas de forma','Medidas de posición']
+            )
+        variable=df_energias_centro_poblado[y_var]
+        mean=variable.mean()
+        median=variable.median()
+        mode=variable.mode()
+        min=variable.min()
+        max=variable.max()
+        var=variable.var()
+        std=round(variable.std(),2)
+        range=max-min
+        cv=round((std/mean)*100,2)
+        asimetria=variable.skew()
+        kurtosis=variable.kurt()
+        Q1=variable.quantile(0.25)
+        Q2=variable.quantile(0.50)
+        Q3=variable.quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        if estadistica=='Medidas de tendencia central':
+            st.write("""
+                Las **medidas de tendencia central** incluyen la **media**, 
+                **mediana** y **moda**. 
+                Estas medidas nos indican el valor alrededor del cual se agrupan los datos. 
+                La **media** es el promedio, 
+                la **mediana** es el valor en el medio de los datos ordenados, 
+                y la **moda** es el valor más frecuente.
+            """)
+            tendencia_cental=pd.DataFrame(
+                {'Media':mean,
+                'Mediana':median,
+                'Moda':mode}
+            )
+            st.dataframe(tendencia_cental)
+        elif estadistica=='Medidas de variabilidad':
+            st.write("""
+                Las **medidas de variabilidad** incluyen el **máximo**, **mínimo**, **rango**,
+                **varianza**, **desviación estándar** y **coeficiente de variación**. 
+                Estas medidas nos indican cuán dispersos o concentrados están 
+                los datos alrededor de la tendencia central.           
+            """)
+            variabilidad=pd.DataFrame(
+                {'Mínimo':[min],
+                'Máximo':[max],
+                'Rango':[range],
+                'Varianza':[var],
+                'Desviación Estándar':[std],
+                'Coeficiente de Variación':[cv]}
+            )
+            st.dataframe(variabilidad)
+        elif estadistica=='Medidas de forma':
+            st.write("""
+            Las **medidas de forma** incluyen la **asimetría (skewness)** y la **curtosis**. 
+            La **asimetría** nos indica si la distribución está sesgada hacia la derecha o 
+            hacia la izquierda. 
+            La **curtosis** nos indica la "altitud" de las colas de la distribución 
+            (si son más gruesas o más delgadas que una distribución normal).         
+            """)      
+            forma=pd.DataFrame(
+            {'Coeficiente de asimetría':[asimetria],
+            'Coeficiente de Kurtosis':[kurtosis]}
+            )
+            st.dataframe(forma)
+        elif estadistica=='Medidas de posición':
+            st.write("""
+            Las **medidas de posición** incluyen los **cuartiles**. 
+            Estas medidas nos indican la posición relativa de un valor en el conjunto de datos, 
+            dividiendo los datos en diferentes intervalos para mejor comprensión de su 
+            distribución.        
+            """)
+            posicion=pd.DataFrame(
+                {'Primer cuartil':[Q1],
+                'Segundo cuartil':[Q2],
+                'Tercer cuartil':[Q3],
+                'Rango intercuartílico':[IQR],
+                'Límite inferior':[lower_bound],
+                'Límite superior':[upper_bound]}
+            )
+            st.dataframe(posicion)
+        graficas=st.selectbox(
+            '**Gráficas descriptivas**',
+            ['Boxplot','Histograma de frecuencias','Gráfico de densidad']
+            )
+        if graficas=='Boxplot':
+            boxplot=px.box(
+                df_centro_poblado,x='Centro Poblado',y=y_var 
                 )
-            variable=df_energias_centro_poblado[y_var]
-            mean=variable.mean()
-            median=variable.median()
-            mode=variable.mode()
-            min=variable.min()
-            max=variable.max()
-            var=variable.var()
-            std=round(variable.std(),2)
-            range=max-min
-            cv=round((std/mean)*100,2)
-            asimetria=variable.skew()
-            kurtosis=variable.kurt()
-            Q1=variable.quantile(0.25)
-            Q2=variable.quantile(0.50)
-            Q3=variable.quantile(0.75)
-            IQR = Q3 - Q1
-            lower_bound = Q1 - 1.5 * IQR
-            upper_bound = Q3 + 1.5 * IQR
-            if estadistica=='Medidas de tendencia central':
-                st.write("""
-                    Las **medidas de tendencia central** incluyen la **media**, 
-                    **mediana** y **moda**. 
-                    Estas medidas nos indican el valor alrededor del cual se agrupan los datos. 
-                    La **media** es el promedio, 
-                    la **mediana** es el valor en el medio de los datos ordenados, 
-                    y la **moda** es el valor más frecuente.
-                """)
-                tendencia_cental=pd.DataFrame(
-                    {'Media':mean,
-                    'Mediana':median,
-                    'Moda':mode}
+            st.plotly_chart(
+                boxplot, use_container_width=True
                 )
-                st.dataframe(tendencia_cental)
-            elif estadistica=='Medidas de variabilidad':
-                st.write("""
-                    Las **medidas de variabilidad** incluyen el **máximo**, **mínimo**, **rango**,
-                    **varianza**, **desviación estándar** y **coeficiente de variación**. 
-                    Estas medidas nos indican cuán dispersos o concentrados están 
-                    los datos alrededor de la tendencia central.           
-                """)
-                variabilidad=pd.DataFrame(
-                    {'Mínimo':[min],
-                    'Máximo':[max],
-                    'Rango':[range],
-                    'Varianza':[var],
-                    'Desviación Estándar':[std],
-                    'Coeficiente de Variación':[cv]}
+        elif graficas=='Histograma de frecuencias':
+            numero_datos=len(variable)
+            bins=int(math.log2(numero_datos+1))
+            clases=pd.cut(variable, bins=bins)
+            fa=clases.value_counts().sort_index()
+            fa_acum =fa.cumsum()
+            fr=(fa/fa.sum())*100
+            fr_acum=fr.cumsum()
+            t_frecuencia=pd.DataFrame({
+                'Intervalo de clase':fa.index.astype(str),
+                'Frecuencia absoluta (f)':fa.values,
+                'Frecuencia absoluta acumulada (F)':fa_acum.values,
+                'Frecuencia relativa (fr) [%]':fr.values,
+                'Frecuencia relativa acumulada (Fr) [%]':fr_acum.values
+            })
+            st.dataframe(t_frecuencia)
+            histograma=px.histogram(
+                df_energias_centro_poblado,x=y_var,nbins=bins
+            )
+            st.plotly_chart(
+                histograma, use_container_width=True
                 )
-                st.dataframe(variabilidad)
-            elif estadistica=='Medidas de forma':
-                st.write("""
-                Las **medidas de forma** incluyen la **asimetría (skewness)** y la **curtosis**. 
-                La **asimetría** nos indica si la distribución está sesgada hacia la derecha o 
-                hacia la izquierda. 
-                La **curtosis** nos indica la "altitud" de las colas de la distribución 
-                (si son más gruesas o más delgadas que una distribución normal).         
-                """)      
-                forma=pd.DataFrame(
-                {'Coeficiente de asimetría':[asimetria],
-                'Coeficiente de Kurtosis':[kurtosis]}
+        elif graficas=='Gráfico de densidad':
+            kde = gaussian_kde(variable, bw_method=0.1)
+            x_densidad=np.linspace(min,max,1000)
+            y_densidad=kde(x_densidad)
+            densidad=go.Figure()
+            densidad.add_trace(go.Scatter(
+                x=x_densidad,y=y_densidad,mode='lines',name='Densidad KDE'
+                ))
+            densidad.update_layout(
+                xaxis_title=y_var,
+                yaxis_title='Densidad'
+            )
+            st.plotly_chart(
+                densidad, use_container_width=True
                 )
-                st.dataframe(forma)
-            elif estadistica=='Medidas de posición':
-                st.write("""
-                Las **medidas de posición** incluyen los **cuartiles**. 
-                Estas medidas nos indican la posición relativa de un valor en el conjunto de datos, 
-                dividiendo los datos en diferentes intervalos para mejor comprensión de su 
-                distribución.        
-                """)
-                posicion=pd.DataFrame(
-                    {'Primer cuartil':[Q1],
-                    'Segundo cuartil':[Q2],
-                    'Tercer cuartil':[Q3],
-                    'Rango intercuartílico':[IQR],
-                    'Límite inferior':[lower_bound],
-                    'Límite superior':[upper_bound]}
-                )
-                st.dataframe(posicion)
-            graficas=st.selectbox(
-                '**Gráficas descriptivas**',
-                ['Boxplot','Histograma de frecuencias','Gráfico de densidad']
-                )
-            if graficas=='Boxplot':
-                boxplot=px.box(
-                    df_centro_poblado,x='Centro Poblado',y=y_var 
-                    )
-                st.plotly_chart(
-                    boxplot, use_container_width=True
-                    )
-            elif graficas=='Histograma de frecuencias':
-                numero_datos=len(variable)
-                bins=int(math.log2(numero_datos+1))
-                clases=pd.cut(variable, bins=bins)
-                fa=clases.value_counts().sort_index()
-                fa_acum =fa.cumsum()
-                fr=(fa/fa.sum())*100
-                fr_acum=fr.cumsum()
-                t_frecuencia=pd.DataFrame({
-                    'Intervalo de clase':fa.index.astype(str),
-                    'Frecuencia absoluta (f)':fa.values,
-                    'Frecuencia absoluta acumulada (F)':fa_acum.values,
-                    'Frecuencia relativa (fr) [%]':fr.values,
-                    'Frecuencia relativa acumulada (Fr) [%]':fr_acum.values
-                })
-                st.dataframe(t_frecuencia)
-                histograma=px.histogram(
-                    df_energias_centro_poblado,x=y_var,nbins=bins
-                )
-                st.plotly_chart(
-                    histograma, use_container_width=True
-                    )
-            elif graficas=='Gráfico de densidad':
-                kde = gaussian_kde(variable, bw_method=0.1)
-                x_densidad=np.linspace(min,max,1000)
-                y_densidad=kde(x_densidad)
-                densidad=go.Figure()
-                densidad.add_trace(go.Scatter(
-                    x=x_densidad,y=y_densidad,mode='lines',name='Densidad KDE'
-                    ))
-                densidad.update_layout(
-                    xaxis_title=y_var,
-                    yaxis_title='Densidad'
-                )
-                st.plotly_chart(
-                    densidad, use_container_width=True
-                    )
-#Este es mi PR
