@@ -15,7 +15,6 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_score
 
-
 st.set_page_config(layout="centered",
     page_title="Energía Zonas no Interconectadas",
     page_icon="💡"
