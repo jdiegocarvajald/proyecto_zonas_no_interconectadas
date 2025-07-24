@@ -549,5 +549,3 @@ if opcion=="Análisis por centro poblado":
             st.plotly_chart(
                 densidad, use_container_width=True
                 )
-            
-# .
