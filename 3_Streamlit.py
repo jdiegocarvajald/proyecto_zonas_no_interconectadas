@@ -23,7 +23,7 @@ t1,t2=st.columns(
     [0.3,0.7]
     ) 
 t1.image(
-    'zonas_no_interconectadas.webp', width = 300
+    'zonas_no_interconectadas.webp', use_container_width=True
     )
 t2.title(
     "Estado de Prestación de Servicios en Zonas no Interconectadas de Colombia"
@@ -97,7 +97,8 @@ if opcion=="Análisis general":
         analisis_g=st.selectbox('Medidas individuales',[
             'Descripción zonas no interconectadas',
             'Descripción CNPV',
-            'Descripción NBI'
+            'Descripción NBI',
+            'Descripción Energética'
         ])
         if analisis_g=='Descripción zonas no interconectadas':
             zonas_no_int=st.selectbox('Zonas no interconectadas',[
@@ -229,6 +230,201 @@ if opcion=="Análisis general":
                 st.plotly_chart(
                     pie_nbi_loc, use_container_width=True
                 )
+        elif analisis_g=='Descripción Energética':
+            des_energ=st.selectbox('Seleccione Variable',[
+                'Energía activa', 'Energía reactiva', 'Potencia máxima', 'Promedio diario horas'])
+            if des_energ=='Energía activa':
+                des_energ_act=st.selectbox('Seleccione',[
+                    'Departamentos con mayor energía activa',
+                    'Municipios con mayor energía activa',
+                    'Centros poblados con mayor energía activa'
+                ])
+                if des_energ_act=='Departamentos con mayor energía activa':
+                    activa_dep=energias_df.groupby(['Departamento'])[
+                        'Energía Activa [kWh]'
+                        ].mean().reset_index().sort_values(
+                            by='Energía Activa [kWh]',ascending=False
+                            )
+                    st.dataframe(activa_dep)
+                    pie_activa_dep=px.pie(
+                        activa_dep,names='Departamento',\
+                            values='Energía Activa [kWh]'
+                    )
+                    st.plotly_chart(
+                        pie_activa_dep, use_container_width=True
+                    )
+                elif des_energ_act=='Municipios con mayor energía activa':
+                    activa_mun=energias_df.groupby(['Departamento','Municipio'])[
+                        'Energía Activa [kWh]'
+                        ].mean().reset_index().sort_values(
+                            by='Energía Activa [kWh]',ascending=False
+                            )
+                    st.dataframe(activa_mun)
+                    pie_activa_mun=px.pie(
+                        activa_mun,names='Municipio',\
+                            values='Energía Activa [kWh]'
+                    )
+                    st.plotly_chart(
+                        pie_activa_mun, use_container_width=True
+                    )
+                elif des_energ_act=='Centros poblados con mayor energía activa':
+                    activa_cp=energias_df.groupby(['Departamento','Municipio','Centro Poblado'])[
+                        'Energía Activa [kWh]'
+                        ].mean().reset_index().sort_values(
+                            by='Energía Activa [kWh]',ascending=False
+                            )
+                    st.dataframe(activa_cp)
+                    pie_activa_cp=px.pie(
+                        activa_cp,names='Centro Poblado',\
+                            values='Energía Activa [kWh]'
+                    )
+                    st.plotly_chart(
+                        pie_activa_cp, use_container_width=True
+                    )
+            elif des_energ=='Energía reactiva':
+                des_energ_reac=st.selectbox('Seleccione',[
+                    'Departamentos con mayor energía reactiva',
+                    'Municipios con mayor energía reactiva',
+                    'Centros poblados con mayor energía reactiva'
+                ])  
+                if des_energ_reac=='Departamentos con mayor energía reactiva':
+                    reactiva_dep=energias_df.groupby(['Departamento'])[
+                        'Energía Reactiva [kVArh]'
+                        ].mean().reset_index().sort_values(
+                            by='Energía Reactiva [kVArh]',ascending=False
+                            )
+                    st.dataframe(reactiva_dep)
+                    pie_react_dep=px.pie(
+                        reactiva_dep,names='Departamento',\
+                            values='Energía Reactiva [kVArh]'
+                    )
+                    st.plotly_chart(
+                        pie_react_dep, use_container_width=True
+                    )
+                elif des_energ_reac=='Municipios con mayor energía reactiva':
+                    reactiva_mun=energias_df.groupby(['Departamento','Municipio'])[
+                        'Energía Reactiva [kVArh]'
+                        ].mean().reset_index().sort_values(
+                            by='Energía Reactiva [kVArh]',ascending=False
+                            )
+                    st.dataframe(reactiva_mun)
+                    pie_react_mun=px.pie(
+                        reactiva_mun,names='Municipio',\
+                            values='Energía Reactiva [kVArh]'
+                    )
+                    st.plotly_chart(
+                        pie_react_mun, use_container_width=True
+                    )
+                elif des_energ_reac=='Centros poblados con mayor energía reactiva':
+                    reactiva_cp=energias_df.groupby(['Departamento','Municipio','Centro Poblado'])[
+                        'Energía Reactiva [kVArh]'
+                        ].mean().reset_index().sort_values(
+                            by='Energía Reactiva [kVArh]',ascending=False
+                            )
+                    st.dataframe(reactiva_cp)
+                    pie_reactiva_cp=px.pie(
+                        reactiva_cp,names='Centro Poblado',\
+                            values='Energía Reactiva [kVArh]'
+                    )
+                    st.plotly_chart(
+                        pie_reactiva_cp, use_container_width=True
+                    )
+            elif des_energ=='Potencia máxima':
+                des_energ_pot=st.selectbox('Seleccione',[
+                    'Departamentos con mayor potencia máxima',
+                    'Municipios con mayor potencia máxima',
+                    'Centros poblados con mayor potencia máxima'
+                ])  
+                if des_energ_pot=='Departamentos con mayor potencia máxima':
+                    pot_dep=energias_df.groupby(['Departamento'])[
+                        'Potencia Máxima [kW]'
+                        ].mean().reset_index().sort_values(
+                            by='Potencia Máxima [kW]',ascending=False
+                            )
+                    st.dataframe(pot_dep)
+                    pie_pot_dep=px.pie(
+                        pot_dep,names='Departamento',\
+                            values='Potencia Máxima [kW]'
+                    )
+                    st.plotly_chart(
+                        pie_pot_dep, use_container_width=True
+                    )
+                elif des_energ_pot=='Municipios con mayor potencia máxima':
+                    pot_mun=energias_df.groupby(['Departamento','Municipio'])[
+                        'Potencia Máxima [kW]'
+                        ].mean().reset_index().sort_values(
+                            by='Potencia Máxima [kW]',ascending=False
+                            )
+                    st.dataframe(pot_mun)
+                    pie_pot_mun=px.pie(
+                        pot_mun,names='Municipio',\
+                            values='Potencia Máxima [kW]'
+                    )
+                    st.plotly_chart(
+                        pie_pot_mun, use_container_width=True
+                    )
+                elif des_energ_pot=='Centros poblados con mayor potencia máxima':
+                    reactiva_cp=energias_df.groupby(['Departamento','Municipio','Centro Poblado'])[
+                        'Potencia Máxima [kW]'
+                        ].mean().reset_index().sort_values(
+                            by='Potencia Máxima [kW]',ascending=False
+                            )
+                    st.dataframe(reactiva_cp)
+                    pie_pot_cp=px.pie(
+                        reactiva_cp,names='Centro Poblado',\
+                            values='Potencia Máxima [kW]'
+                    )
+                    st.plotly_chart(
+                        pie_pot_cp, use_container_width=True
+                    )
+            elif des_energ=='Promedio diario horas':
+                des_energ_pot=st.selectbox('Seleccione',[
+                    'Departamentos con mayor Promedio diario horas',
+                    'Municipios con mayor Promedio diario horas',
+                    'Centros poblados con mayor Promedio diario horas'
+                ])  
+                if des_energ_pot=='Departamentos con mayor Promedio diario horas':
+                    horas_dep=energias_df.groupby(['Departamento'])[
+                        'Promedio Diario [h]'
+                        ].mean().reset_index().sort_values(
+                            by='Promedio Diario [h]',ascending=False
+                            )
+                    st.dataframe(horas_dep)
+                    pie_horas_dep=px.pie(
+                        horas_dep,names='Departamento',\
+                            values='Promedio Diario [h]'
+                    )
+                    st.plotly_chart(
+                        pie_horas_dep, use_container_width=True
+                    )
+                elif des_energ_pot=='Municipios con mayor Promedio diario horas':
+                    horas_mun=energias_df.groupby(['Departamento','Municipio'])[
+                        'Promedio Diario [h]'
+                        ].mean().reset_index().sort_values(
+                            by='Promedio Diario [h]',ascending=False
+                            )
+                    st.dataframe(horas_mun)
+                    pie_horas_mun=px.pie(
+                        horas_mun,names='Municipio',\
+                            values='Promedio Diario [h]'
+                    )
+                    st.plotly_chart(
+                        pie_horas_mun, use_container_width=True
+                    )
+                elif des_energ_pot=='Centros poblados con mayor Promedio diario horas':
+                    horas_cp=energias_df.groupby(['Departamento','Municipio','Centro Poblado'])[
+                        'Promedio Diario [h]'
+                        ].mean().reset_index().sort_values(
+                            by='Promedio Diario [h]',ascending=False
+                            )
+                    st.dataframe(horas_cp)
+                    pie_pot_cp=px.pie(
+                        horas_cp,names='Centro Poblado',\
+                            values='Promedio Diario [h]'
+                    )
+                    st.plotly_chart(
+                        pie_pot_cp, use_container_width=True
+                    )
     with steps1[2]:
         st.header("Análisis de Agrupamiento (Clusters)")
         # Variables relevantes
@@ -295,12 +491,11 @@ if opcion=="Análisis general":
             resumen_cluster['Descripción'] = resumen_cluster.apply(clasificar_cluster, axis=1)
             # Añadir etiquetas a cada centro poblado
             df_cluster['Etiqueta'] = df_cluster['Cluster'].map(resumen_cluster['Descripción'])
-            
-            st.dataframe(df_cluster[['Departamento', 'Municipio', 'Centro Poblado', 'Cluster', 'Etiqueta']].sort_values(by='Cluster'))
-
             st.dataframe(resumen_cluster)
-
-            st.dataframe(df_cluster[['Departamento', 'Municipio', 'Centro Poblado', 'Cluster']].sort_values(by='Cluster'))
+            st.dataframe(df_cluster[[
+                'Departamento', 'Municipio', 'Centro Poblado','Energía Activa [kWh]', \
+                    'Energía Reactiva [kVArh]', 'Factor de Potencia', 'Cluster', 'Etiqueta'
+                ]].sort_values(by='Cluster'))
 
 if opcion=="Análisis por centro poblado":
     steps=st.tabs(
