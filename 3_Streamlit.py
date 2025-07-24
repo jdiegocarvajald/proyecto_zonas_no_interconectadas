@@ -17,14 +17,14 @@ st.set_page_config(layout="centered",
 t1,t2=st.columns(
     [0.3,0.7]
     ) 
-t1.image(
-    'zonas_no_interconectadas.webp', width = 300
-    )
+# t1.image(
+#     'zonas_no_interconectadas.webp', width = 300
+#     )
 t2.title(
     "Estado de Prestación de Servicios en Zonas no Interconectadas de Colombia"
     )
 engine=create_engine(
-    "postgresql://postgres:Entropia18*@localhost:5432/EnergiasZonasNoInterconectadasCol"
+    "postgresql+psycopg2://postgres:123456@localhost:5432/zniBasedatos?client_encoding=WIN1252"
     )
 energias_df=pd.read_sql(
     'SELECT * FROM energias.servicios_detalle;' , engine
@@ -51,43 +51,87 @@ if opcion=="Análisis general":
     with steps1[0]:
         st.markdown('## Visión general de los datos')
         st.dataframe(energias_df)
-        var_map=st.selectbox('Seleccione la variable a visualizar',[
-            'Promedio Diario [h]','Energía Activa [kWh]','Energía Reactiva [kVArh]',
-            'Potencia Máxima [kW]','Total Personas en Hogares Particulares',
-            'Personas en NBI [%]','Componente Servicios [%]'
-        ])
-        energias_map=pd.DataFrame({
-            var_map:energias_df.groupby('Centro Poblado')[var_map].median(),
-            'lat':energias_df.groupby('Centro Poblado')['Latitud'].mean(),
-            'lon':energias_df.groupby('Centro Poblado')['Longitud'].mean()
-        })
-        energias_map = energias_map.dropna(subset=['lat', 'lon', var_map])
-        energias_map = energias_map.drop_duplicates(subset=['lat', 'lon'])
-        energias_map['elevation_norm']=energias_map[var_map]/energias_map[var_map].max()*10000
+
+        # Selección de variable
+        var_map = st.selectbox(
+            'Seleccione la variable a visualizar',
+            [
+                'Promedio Diario [h]', 'Energía Activa [kWh]', 'Energía Reactiva [kVArh]',
+                'Potencia Máxima [kW]', 'Total Personas en Hogares Particulares',
+                'Personas en NBI [%]', 'Componente Servicios [%]'
+            ]
+        )
+
+        # Elegir método de agregación
+        metodo_agregacion = st.radio(
+            "Método de agregación por centro poblado:",
+            ['Media', 'Mediana'],
+            horizontal=True
+        )
+
+        # Agregación por centro poblado con lat/lon únicos por centro poblado + municipio + departamento
+        agrupadores = ['Centro Poblado', 'Municipio', 'Departamento']
+
+        if metodo_agregacion == 'Media':
+            energias_map = energias_df.groupby(agrupadores).agg({
+                var_map: 'mean',
+                'Latitud': 'mean',
+                'Longitud': 'mean'
+            }).reset_index()
+        else:
+            energias_map = energias_df.groupby(agrupadores).agg({
+                var_map: 'median',
+                'Latitud': 'mean',
+                'Longitud': 'mean'
+            }).reset_index()
+
+        # Limpieza de datos
+        energias_map = energias_map.dropna(subset=['Latitud', 'Longitud', var_map])
+        energias_map['elevation_norm'] = energias_map[var_map] / energias_map[var_map].max() * 10000
+
+        # Escala de color dinámica (verde = bajo, rojo = alto)
+        energias_map['color_r'] = (255 * energias_map[var_map] / energias_map[var_map].max()).astype(int)
+        energias_map['color_g'] = (255 * (1 - energias_map[var_map] / energias_map[var_map].max())).astype(int)
+        energias_map['color_b'] = 120
+        energias_map['color'] = energias_map[['color_r', 'color_g', 'color_b']].values.tolist()
+
+        # Capa del mapa
         column_layer = pdk.Layer(
             'ColumnLayer',
             data=energias_map,
-            get_position='[lon, lat]',
+            get_position='[Longitud, Latitud]',
             get_elevation='elevation_norm',
             elevation_scale=100,
             radius=2000,
-            get_fill_color="[200, 0, 0, 160]",
+            get_fill_color='color',
             pickable=True,
             auto_highlight=True,
-        )   
+        )
+
         view_state = pdk.ViewState(
-            latitude=energias_map['lat'].mean(),
-            longitude=energias_map['lon'].mean(),
+            latitude=energias_map['Latitud'].mean(),
+            longitude=energias_map['Longitud'].mean(),
             zoom=6,
             pitch=45,
             bearing=0    
         )
+
+        # Mapa final
         st.pydeck_chart(pdk.Deck(
             map_style="light",
             initial_view_state=view_state,
             layers=[column_layer],
-            tooltip={"text": f"{var_map}: {{{var_map}}}"}
+            tooltip = {
+                "html": """
+                    <b>Centro Poblado:</b> {Centro Poblado}<br>
+                    <b>Municipio:</b> {Municipio}<br>
+                    <b>%s:</b> {%s}
+                """ % (var_map, var_map),
+                "style": {"backgroundColor": "steelblue", "color": "white"}
+            }
+
         ))
+
     with steps1[1]:
         analisis_g=st.selectbox('Medidas individuales',[
             'Descripción zonas no interconectadas',
