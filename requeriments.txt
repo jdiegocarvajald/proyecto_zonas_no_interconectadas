@@ -1,0 +1,11 @@
+streamlit
+sqlalchemy
+psycopg2-binary
+pandas
+numpy
+seaborn
+matplotlib
+plotly
+pydeck
+scikit-learn
+scipy
